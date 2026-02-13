@@ -1,232 +1,182 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from src.loader import load_data
+from src.loader import load_data, save_data # Certifique-se que save_data está no loader
 import time
 
 # ==============================
-# CONFIGURAÇÃO INICIAL
+# CONFIGURAÇÃO PRO & CSS
 # ==============================
 st.set_page_config(
-    page_title="EcoPad Manager",
+    page_title="EcoPad Manager PRO",
     layout="wide",
     page_icon="🌿",
     initial_sidebar_state="expanded"
 )
 
-# ==============================
-# FUNÇÃO DE INSIGHTS
-# ==============================
-def gerar_insights_ia(df_vendas, df_estoque, lucro_atual):
-    insights = []
-
-    if not df_vendas.empty:
-        top_canal = df_vendas.groupby("plataforma")["valor_total"].sum().idxmax()
-        insights.append(f"📢 Canal forte: {top_canal}")
-
-    estoque_critico = df_estoque[df_estoque["status"] == "BAIXO"]
-    if not estoque_critico.empty:
-        prod_critico = estoque_critico.iloc[0]["nome_produto"]
-        insights.append(f"🚨 Estoque baixo: {prod_critico}")
-
-    if lucro_atual < 0:
-        insights.append("📉 Operação com prejuízo.")
-    else:
-        insights.append("🚀 Operação lucrativa.")
-
-    return insights
+# CSS para visual limpo e profissional
+st.markdown("""
+    <style>
+        .block-container {padding-top: 1.5rem; padding-bottom: 1rem;}
+        h1 {margin-top: -50px;}
+        .stMetric {background-color: #0E1117; padding: 10px; border-radius: 5px;}
+        /* Esconde menus padrões do Streamlit para parecer App Nativo */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 # ==============================
-# CARREGAR DADOS
+# CARGA DE DADOS
 # ==============================
 try:
+    # Força recarga dos dados para garantir atualização pós-lançamento
     produtos, vendas, estoque, custos, calendario = load_data()
-
-    # Padronizar colunas
+    
+    # Padronização
     for df in [produtos, vendas, estoque, custos, calendario]:
         df.columns = df.columns.str.strip().str.lower()
-
-    # Converter datas
-    vendas["data"] = pd.to_datetime(vendas["data"], errors="coerce")
-    calendario["data"] = pd.to_datetime(calendario["data"], errors="coerce")
-
-    # Criar valor total
     vendas["valor_total"] = vendas["valor_unit"] * vendas["qtd"]
 
 except Exception as e:
-    st.error(f"Erro no carregamento dos dados: {e}")
+    st.error(f"Erro crítico no sistema: {e}")
     st.stop()
 
 # ==============================
-# SIDEBAR
+# NAVEGAÇÃO PRINCIPAL (SIDEBAR)
 # ==============================
 with st.sidebar:
-
-    st.title("🌿 Gerenciador EcoPad")
-    st.markdown("*Gestão Estratégica & Sustentável*")
-    st.divider()
-
-    # Merge com calendário
-    vendas = vendas.merge(calendario, on="data", how="left")
-
-    meses = vendas["nome_mes"].dropna().unique()
-    plataformas = vendas["plataforma"].dropna().unique()
-
-    mes_sel = st.multiselect("Período (Mês)", meses, default=meses)
-    canal_sel = st.multiselect("Canal", plataformas, default=plataformas)
-
-    vendas_filtradas = vendas.copy()
-
-    if mes_sel:
-        vendas_filtradas = vendas_filtradas[
-            vendas_filtradas["nome_mes"].isin(mes_sel)
-        ]
-
-    if canal_sel:
-        vendas_filtradas = vendas_filtradas[
-            vendas_filtradas["plataforma"].isin(canal_sel)
-        ]
-
-    # Assistente IA
-    st.divider()
-    st.subheader("🤖 Assistente")
-
-    if st.button("Gerar análise"):
-
-        with st.spinner("Analisando..."):
-
-            receita_ia = vendas_filtradas["valor_total"].sum()
-            custo_fixo_ia = custos["valor"].sum()
-
-            v_full = vendas_filtradas.merge(produtos, on="id_produto", how="left")
-
-            custo_var_ia = (
-                v_full["qtd"] * v_full["custo_unit"].fillna(0)
-            ).sum()
-
-            lucro_ia = receita_ia - custo_fixo_ia - custo_var_ia
-
-            estoque["atual"] = (
-                estoque["estoque_inicial"]
-                + estoque["entradas"]
-                - estoque["saidas"]
-            )
-
-            estoque["status"] = estoque.apply(
-                lambda x: "BAIXO"
-                if x["atual"] <= x["ponto_reposicao"]
-                else "OK",
-                axis=1,
-            )
-
-            estoque_ia = estoque.merge(
-                produtos[["id_produto", "nome_produto"]],
-                on="id_produto"
-            )
-
-            dicas = gerar_insights_ia(
-                vendas_filtradas,
-                estoque_ia,
-                lucro_ia
-            )
-
-            for d in dicas:
-                st.info(d)
+    st.title("🌿 EcoPad PRO")
+    st.write("---")
+    
+    # O "Menu" que troca as telas
+    pagina = st.radio(
+        "Navegação:", 
+        ["📊 Dashboard Gerencial", "📝 Novo Lançamento"],
+        index=0
+    )
+    
+    st.write("---")
+    
+    # IA só aparece no Dashboard para não distrair no cadastro
+    if pagina == "📊 Dashboard Gerencial":
+        st.subheader("🤖 Eco-Inteligência")
+        if st.button("Analisar Operação", type="primary"):
+            with st.spinner("Processando Big Data..."):
+                time.sleep(1)
+                # Lógica IA
+                rec = vendas["valor_total"].sum()
+                meta = 1000 # Exemplo de meta
+                if rec >= meta:
+                    st.success("🚀 Meta Batida! O faturamento está saudável.")
+                else:
+                    st.warning(f"📉 Faltam R$ {meta - rec:.2f} para a meta.")
+                
+                # Alerta Estoque
+                estoque["atual"] = estoque["estoque_inicial"] + estoque["entradas"] - estoque["saidas"]
+                critico = estoque[estoque["atual"] <= estoque["ponto_reposicao"]]
+                if not critico.empty:
+                    st.error(f"⚠️ Atenção: {len(critico)} produtos com estoque baixo.")
 
 # ==============================
-# DASHBOARD PRINCIPAL
+# TELA 1: DASHBOARD (VISUALIZAÇÃO)
 # ==============================
-st.title("📊 Visão Geral da Operação")
+if pagina == "📊 Dashboard Gerencial":
+    st.title("📈 Visão Estratégica")
+    
+    # Filtros Discretos (Expander fechado por padrão para limpeza)
+    with st.expander("🔎 Filtros Avançados", expanded=False):
+        col_fil1, col_fil2 = st.columns(2)
+        vendas = vendas.merge(calendario, on="data", how="left")
+        meses = vendas["nome_mes"].dropna().unique()
+        sel_mes = col_fil1.multiselect("Mês", meses, default=meses)
+        sel_canal = col_fil2.multiselect("Canal", vendas["plataforma"].unique(), default=vendas["plataforma"].unique())
 
-receita = vendas_filtradas["valor_total"].sum()
-itens = vendas_filtradas["qtd"].sum()
-custo_fixo = custos["valor"].sum()
+    # Aplica Filtros
+    df_view = vendas[vendas["nome_mes"].isin(sel_mes)]
+    if sel_canal:
+        df_view = df_view[df_view["plataforma"].isin(sel_canal)]
 
-vendas_full = vendas_filtradas.merge(
-    produtos,
-    on="id_produto",
-    how="left"
-)
+    # KPIs
+    receita = df_view["valor_total"].sum()
+    itens = df_view["qtd"].sum()
+    lucro_aprox = receita * 0.40 # Exemplo simplificado de margem 40%
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Faturamento Total", f"R$ {receita:,.2f}", delta="Vs. Mês Anterior")
+    c2.metric("Itens Vendidos", itens)
+    c3.metric("Lucro Estimado", f"R$ {lucro_aprox:,.2f}")
+    c4.metric("Ticket Médio", f"R$ {(receita/itens if itens > 0 else 0):,.2f}")
 
-custo_var = (
-    vendas_full["qtd"] * vendas_full["custo_unit"].fillna(0)
-).sum()
+    st.markdown("---")
 
-lucro = receita - custo_fixo - custo_var
-
-# KPIs
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("Faturamento", f"R$ {receita:,.2f}")
-col2.metric("Itens vendidos", itens)
-col3.metric("Custos fixos", f"R$ {custo_fixo:,.2f}")
-col4.metric("Resultado", f"R$ {lucro:,.2f}")
-
-st.divider()
-
-# ==============================
-# GRÁFICOS
-# ==============================
-col_g1, col_g2 = st.columns(2)
-
-with col_g1:
-    st.subheader("🛒 Vendas por canal")
-
-    if not vendas_filtradas.empty:
-        fig1 = px.pie(
-            vendas_filtradas,
-            names="plataforma",
-            values="valor_total",
-            hole=0.5
-        )
+    # Gráficos (Clean Design)
+    g1, g2 = st.columns(2)
+    with g1:
+        st.subheader("Vendas por Canal")
+        fig1 = px.pie(df_view, names="plataforma", values="valor_total", hole=0.6, color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig1.update_layout(height=300, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig1, use_container_width=True)
-
-with col_g2:
-    st.subheader("📈 Evolução das vendas")
-
-    if not vendas_filtradas.empty:
-        vendas_dia = (
-            vendas_filtradas
-            .groupby("data")["valor_total"]
-            .sum()
-            .reset_index()
-        )
-
-        fig2 = px.area(
-            vendas_dia,
-            x="data",
-            y="valor_total"
-        )
-
+    
+    with g2:
+        st.subheader("Evolução Diária")
+        diario = df_view.groupby("data")["valor_total"].sum().reset_index()
+        fig2 = px.line(diario, x="data", y="valor_total", markers=True, line_shape="spline")
+        fig2.update_traces(line_color="#4CAF50") # Verde Eco
+        fig2.update_layout(height=300, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig2, use_container_width=True)
 
 # ==============================
-# ESTOQUE
+# TELA 2: CADASTRO (OPERAÇÃO)
 # ==============================
-st.subheader("📦 Controle de Estoque")
-
-estoque_view = estoque.merge(
-    produtos[["id_produto", "nome_produto"]],
-    on="id_produto"
-)
-
-estoque_view["atual"] = (
-    estoque_view["estoque_inicial"]
-    + estoque_view["entradas"]
-    - estoque_view["saidas"]
-)
-
-estoque_view["status"] = estoque_view.apply(
-    lambda x: "🔴 COMPRAR"
-    if x["atual"] <= x["ponto_reposicao"]
-    else "🟢 OK",
-    axis=1
-)
-
-st.dataframe(
-    estoque_view[
-        ["nome_produto", "atual", "ponto_reposicao", "status"]
-    ],
-    use_container_width=True,
-    hide_index=True
-)
+elif pagina == "📝 Novo Lançamento":
+    st.title("📝 Central de Lançamentos")
+    st.markdown("Insira os dados da venda. O sistema atualizará o Excel e os gráficos automaticamente.")
+    
+    with st.form("form_venda_pro", clear_on_submit=True):
+        col_in1, col_in2 = st.columns(2)
+        
+        # Inputs
+        data_in = col_in1.date_input("Data da Venda")
+        canal_in = col_in2.selectbox("Canal de Venda", ["Shopee", "Mercado Livre", "WhatsApp", "Feira"])
+        
+        st.write("---")
+        
+        col_in3, col_in4 = st.columns(2)
+        # Pega lista de produtos atualizada
+        lista_prods = produtos["nome_produto"].unique()
+        prod_in = col_in3.selectbox("Produto Vendido", lista_prods)
+        qtd_in = col_in4.number_input("Quantidade", min_value=1, value=1)
+        
+        # Botão de Ação
+        submitted = st.form_submit_button("💾 REGISTRAR VENDA", type="primary")
+        
+        if submitted:
+            try:
+                # 1. Recupera ID e Preço do Produto
+                prod_info = produtos[produtos["nome_produto"] == prod_in].iloc[0]
+                id_p = prod_info["id_produto"]
+                preco_unit = prod_info["preco_venda"] # Assume que existe coluna preco_venda, senao usar valor manual
+                
+                # 2. Cria o DataFrame da nova linha
+                # IMPORTANTE: As colunas devem bater com seu Excel 'Vendas.xlsx'
+                novo_df = pd.DataFrame([{
+                    "data": data_in,
+                    "id_produto": id_p,
+                    "qtd": qtd_in,
+                    "valor_unit": preco_unit, # Ou input manual se variar
+                    "plataforma": canal_in
+                }])
+                
+                # 3. Salva usando a função do loader
+                sucesso = save_data(novo_df, "vendas")
+                
+                if sucesso:
+                    st.toast("✅ Venda registrada com sucesso!", icon="🎉")
+                    time.sleep(1.5) # Tempo para ler a mensagem
+                    st.rerun() # ATUALIZA A TELA SOZINHO
+                else:
+                    st.error("Erro ao salvar no Excel. Verifique se o arquivo está fechado.")
+            
+            except Exception as e:
+                st.error(f"Erro no processamento: {e}")
