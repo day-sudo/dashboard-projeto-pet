@@ -198,3 +198,4 @@ elif menu == "📁 Histórico":
     st.subheader("📦 Estoque")
     st.dataframe(estoque, use_container_width=True)
 
+
