@@ -1,13 +1,13 @@
 import pandas as pd
 from pathlib import Path
 
-DATA_PATH = Path("data")
+DADOS_PATH = Path("dados")
 
-def load_data():
+def load_dados():
     # ==============================
     # BASE HISTÓRICA (Excel principal)
     # ==============================
-    base_file = DATA_PATH / "base_historica.xlsx"
+    base_file = DASOS_PATH / "base_historica.xlsx"
 
     produtos = pd.read_excel(base_file, sheet_name="produtos")
     vendas_hist = pd.read_excel(base_file, sheet_name="vendas")
@@ -18,7 +18,7 @@ def load_data():
     # ==============================
     # BASE DO APP (cadastros novos)
     # ==============================
-    vendas_app_file = DATA_PATH / "vendas_app.xlsx"
+    vendas_app_file = DADOS_PATH / "vendas_app.xlsx"
 
     if vendas_app_file.exists():
         vendas_app = pd.read_excel(vendas_app_file)
@@ -33,8 +33,8 @@ def load_data():
         df.columns = df.columns.str.strip().str.lower()
 
     # Converter data
-    if "data" in vendas.columns:
-        vendas["data"] = pd.to_datetime(vendas["data"])
+    if "dados" in vendas.columns:
+        vendas["dados"] = pd.to_datetime(vendas["dados"])
 
     return produtos, vendas, estoque, custos, calendario
 
