@@ -5,7 +5,12 @@ def load_data():
 
     BASE_DIR = Path(__file__).resolve().parent.parent
     arquivo = BASE_DIR / "data" / "bd_empreendimento.xlsx"
-    
+
+    produtos = pd.read_excel(arquivo, sheet_name="produtos")
+    vendas = pd.read_excel(arquivo, sheet_name="vendas")
+    estoque = pd.read_excel(arquivo, sheet_name="estoque")
+    custos = pd.read_excel(arquivo, sheet_name="custos")
+    calendario = pd.read_excel(arquivo, sheet_name="calendario")
 
     # padronizar colunas
     for df in [produtos, vendas, estoque, custos, calendario]:
