@@ -1,144 +1,234 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from src.loader import load_dados, salvar_venda_app, salvar_estoque  # Importação correta
+import plotly.express as px
+from src.loader import load_data
+import time
 
-# =========================
-# CONFIGURAÇÃO
-# =========================
+# ==============================
+# CONFIGURAÇÃO INICIAL
+# ==============================
 st.set_page_config(
-    page_title="EcoPad Manager PRO",
+    page_title="EcoPad Manager",
+    layout="wide",
     page_icon="🌿",
-    layout="wide"
+    initial_sidebar_state="expanded"
 )
 
-# Carregamento Único
-produtos, vendas, estoque, custos, calendario = load_dados()
+# ==============================
+# FUNÇÃO DE INSIGHTS
+# ==============================
+def gerar_insights_ia(df_vendas, df_estoque, lucro_atual):
+    insights = []
 
-if produtos is None:
-    st.error("❌ Base de dados não encontrada. Verifique se o arquivo Excel está no projeto.")
+    if not df_vendas.empty:
+        top_canal = df_vendas.groupby("plataforma")["valor_total"].sum().idxmax()
+        insights.append(f"📢 Canal forte: {top_canal}")
+
+    estoque_critico = df_estoque[df_estoque["status"] == "BAIXO"]
+    if not estoque_critico.empty:
+        prod_critico = estoque_critico.iloc[0]["nome_produto"]
+        insights.append(f"🚨 Estoque baixo: {prod_critico}")
+
+    if lucro_atual < 0:
+        insights.append("📉 Operação com prejuízo.")
+    else:
+        insights.append("🚀 Operação lucrativa.")
+
+    return insights
+
+# ==============================
+# CARREGAR DADOS
+# ==============================
+try:
+    produtos, vendas, estoque, custos, calendario = load_data()
+
+    # Padronizar colunas
+    for df in [produtos, vendas, estoque, custos, calendario]:
+        df.columns = df.columns.str.strip().str.lower()
+
+    # Converter datas
+    vendas["data"] = pd.to_datetime(vendas["data"], errors="coerce")
+    calendario["data"] = pd.to_datetime(calendario["data"], errors="coerce")
+
+    # Criar valor total
+    vendas["valor_total"] = vendas["valor_unit"] * vendas["qtd"]
+
+except Exception as e:
+    st.error(f"Erro no carregamento dos dados: {e}")
     st.stop()
 
-# =========================
-# MENU LATERAL
-# =========================
-menu = st.sidebar.radio(
-    "🌿 EcoPad Manager PRO",
-    ["📊 Dashboard", "➕ Nova Venda", "📦 Estoque", "📁 Histórico"]
+# ==============================
+# SIDEBAR
+# ==============================
+with st.sidebar:
+
+    st.title("🌿 Gerenciador EcoPad")
+    st.markdown("*Gestão Estratégica & Sustentável*")
+    st.divider()
+
+    # Merge com calendário
+    vendas = vendas.merge(calendario, on="data", how="left")
+
+    meses = vendas["nome_mes"].dropna().unique()
+    plataformas = vendas["plataforma"].dropna().unique()
+
+    mes_sel = st.multiselect("Período (Mês)", meses, default=meses)
+    canal_sel = st.multiselect("Canal", plataformas, default=plataformas)
+
+    vendas_filtradas = vendas.copy()
+
+    if mes_sel:
+        vendas_filtradas = vendas_filtradas[
+            vendas_filtradas["nome_mes"].isin(mes_sel)
+        ]
+
+    if canal_sel:
+        vendas_filtradas = vendas_filtradas[
+            vendas_filtradas["plataforma"].isin(canal_sel)
+        ]
+
+    # Assistente IA
+    st.divider()
+    st.subheader("🤖 Assistente")
+
+    if st.button("Gerar análise"):
+
+        with st.spinner("Analisando..."):
+
+            receita_ia = vendas_filtradas["valor_total"].sum()
+            custo_fixo_ia = custos["valor"].sum()
+
+            v_full = vendas_filtradas.merge(produtos, on="id_produto", how="left")
+
+            custo_var_ia = (
+                v_full["qtd"] * v_full["custo_unit"].fillna(0)
+            ).sum()
+
+            lucro_ia = receita_ia - custo_fixo_ia - custo_var_ia
+
+            estoque["atual"] = (
+                estoque["estoque_inicial"]
+                + estoque["entradas"]
+                - estoque["saidas"]
+            )
+
+            estoque["status"] = estoque.apply(
+                lambda x: "BAIXO"
+                if x["atual"] <= x["ponto_reposicao"]
+                else "OK",
+                axis=1,
+            )
+
+            estoque_ia = estoque.merge(
+                produtos[["id_produto", "nome_produto"]],
+                on="id_produto"
+            )
+
+            dicas = gerar_insights_ia(
+                vendas_filtradas,
+                estoque_ia,
+                lucro_ia
+            )
+
+            for d in dicas:
+                st.info(d)
+
+# ==============================
+# DASHBOARD PRINCIPAL
+# ==============================
+st.title("📊 Visão Geral da Operação")
+
+receita = vendas_filtradas["valor_total"].sum()
+itens = vendas_filtradas["qtd"].sum()
+custo_fixo = custos["valor"].sum()
+
+vendas_full = vendas_filtradas.merge(
+    produtos,
+    on="id_produto",
+    how="left"
 )
 
-# =========================
-# DASHBOARD
-# =========================
-if menu == "📊 Dashboard":
-    st.title("📊 Painel de Controle")
+custo_var = (
+    vendas_full["qtd"] * vendas_full["custo_unit"].fillna(0)
+).sum()
 
-    # Cálculos usando as colunas padronizadas (minúsculas) do loader
-    total_vendas = vendas["valor_total"].sum() if "valor_total" in vendas.columns else 0
-    total_itens = vendas["qtd"].sum() if "qtd" in vendas.columns else 0
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Receita Total", f"R$ {total_vendas:,.2f}")
-    col2.metric("📦 Itens Vendidos", total_itens)
-    col3.metric("🛍️ Produtos Ativos", len(produtos))
+lucro = receita - custo_fixo - custo_var
 
-    st.divider()
+# KPIs
+col1, col2, col3, col4 = st.columns(4)
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("📈 Vendas por Produto")
-        # Gráfico dinâmico
-        vendas_prod = vendas.groupby("id_produto")["qtd"].sum()
-        st.bar_chart(vendas_prod)
-    
-    with c2:
-        st.subheader("📦 Alerta de Estoque")
-        st.dataframe(estoque[estoque["quantidade"] < 5], use_container_width=True)
+col1.metric("Faturamento", f"R$ {receita:,.2f}")
+col2.metric("Itens vendidos", itens)
+col3.metric("Custos fixos", f"R$ {custo_fixo:,.2f}")
+col4.metric("Resultado", f"R$ {lucro:,.2f}")
 
-# =========================
-# NOVA VENDA
-# =========================
-elif menu == "➕ Nova Venda":
-    st.title("➕ Registrar Nova Venda")
+st.divider()
 
-    with st.form("form_venda", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        data = col1.date_input("Data", datetime.today())
-        # Busca produtos do dataframe carregado
-        produto_nome = col2.selectbox("Produto", produtos["nome_produto"].unique())
-        
-        col3, col4 = st.columns(2)
-        quantidade = col3.number_input("Quantidade", min_value=1, step=1)
-        valor_unit = col4.number_input("Valor Unitário (R$)", min_value=0.0)
+# ==============================
+# GRÁFICOS
+# ==============================
+col_g1, col_g2 = st.columns(2)
 
-        if st.form_submit_button("Registrar"):
-            # Lógica PRO: Pegar o ID do produto automaticamente
-            id_prod = produtos[produtos["nome_produto"] == produto_nome]["id_produto"].values[0]
-            
-            nova_linha = pd.DataFrame([{
-                "data": data,
-                "id_produto": id_prod,
-                "qtd": quantidade,
-                "valor_unit": valor_unit,
-                "valor_total": quantidade * valor_unit
-            }])
-            
-            salvar_venda_app(nova_linha)
-            st.success("Venda enviada para processamento! 🚀")
-            st.rerun()
+with col_g1:
+    st.subheader("🛒 Vendas por canal")
 
-# =========================
-# CONTROLE DE ESTOQUE
-# =========================
+    if not vendas_filtradas.empty:
+        fig1 = px.pie(
+            vendas_filtradas,
+            names="plataforma",
+            values="valor_total",
+            hole=0.5
+        )
+        st.plotly_chart(fig1, use_container_width=True)
 
-elif menu == "📦 Estoque":
+with col_g2:
+    st.subheader("📈 Evolução das vendas")
 
-    st.title("📦 Controle de Estoque")
-
-    with st.form("form_estoque"):
-
-        produto = st.text_input("Produto")
-
-        quantidade = st.number_input(
-            "Quantidade a adicionar",
-            min_value=1,
-            step=1
+    if not vendas_filtradas.empty:
+        vendas_dia = (
+            vendas_filtradas
+            .groupby("data")["valor_total"]
+            .sum()
+            .reset_index()
         )
 
-        salvar = st.form_submit_button("Adicionar ao estoque")
+        fig2 = px.area(
+            vendas_dia,
+            x="data",
+            y="valor_total"
+        )
 
-        if salvar and produto:
+        st.plotly_chart(fig2, use_container_width=True)
 
-            nova_linha = {
-                "produto": produto,
-                "quantidade": quantidade,
-                "data": datetime.today().strftime("%Y-%m-%d")  # Adiciona data para controle
-            }
+# ==============================
+# ESTOQUE
+# ==============================
+st.subheader("📦 Controle de Estoque")
 
-            if salvar_estoque(nova_linha):
-                st.success("Estoque atualizado! 📦")
-                st.rerun()
-            else:
-                st.error("Erro ao salvar estoque. Tente novamente.")
+estoque_view = estoque.merge(
+    produtos[["id_produto", "nome_produto"]],
+    on="id_produto"
+)
 
-    st.divider()
+estoque_view["atual"] = (
+    estoque_view["estoque_inicial"]
+    + estoque_view["entradas"]
+    - estoque_view["saidas"]
+)
 
-    st.subheader("📦 Estoque Atual")
-    st.dataframe(estoque, use_container_width=True)
+estoque_view["status"] = estoque_view.apply(
+    lambda x: "🔴 COMPRAR"
+    if x["atual"] <= x["ponto_reposicao"]
+    else "🟢 OK",
+    axis=1
+)
 
-
-# =========================
-# HISTÓRICO
-# =========================
-
-elif menu == "📁 Histórico":
-
-    st.title("📁 Histórico Completo")
-
-    st.subheader("🛒 Vendas")
-    st.dataframe(vendas, use_container_width=True)
-
-    st.subheader("📦 Estoque")
-    st.dataframe(estoque, use_container_width=True)
+st.dataframe(
+    estoque_view[
+        ["nome_produto", "atual", "ponto_reposicao", "status"]
+    ],
+    use_container_width=True,
+    hide_index=True
+)
 
 
