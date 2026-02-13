@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from src.loader import load_dados, salvar_venda_app # Agora usamos o seu loader!
+from src.loader import load_dados, salvar_venda_app, salvar_estoque  # Importação correta
 
 # =========================
 # CONFIGURAÇÃO
@@ -16,7 +16,7 @@ st.set_page_config(
 produtos, vendas, estoque, custos, calendario = load_dados()
 
 if produtos is None:
-    st.error("❌ Base de dados não encontrada na pasta 'Dados'.")
+    st.error("❌ Base de dados não encontrada. Verifique se o arquivo Excel está no projeto.")
     st.stop()
 
 # =========================
@@ -35,7 +35,7 @@ if menu == "📊 Dashboard":
 
     # Cálculos usando as colunas padronizadas (minúsculas) do loader
     total_vendas = vendas["valor_total"].sum() if "valor_total" in vendas.columns else 0
-    total_itens = vendas["qtd"].sum()
+    total_itens = vendas["qtd"].sum() if "qtd" in vendas.columns else 0
     
     col1, col2, col3 = st.columns(3)
     col1.metric("💰 Receita Total", f"R$ {total_vendas:,.2f}")
@@ -110,14 +110,16 @@ elif menu == "📦 Estoque":
         if salvar and produto:
 
             nova_linha = {
-                "Produto": produto,
-                "Quantidade": quantidade
+                "produto": produto,
+                "quantidade": quantidade,
+                "data": datetime.today().strftime("%Y-%m-%d")  # Adiciona data para controle
             }
 
-            salvar_estoque(nova_linha)
-
-            st.success("Estoque atualizado! 📦")
-            st.rerun()
+            if salvar_estoque(nova_linha):
+                st.success("Estoque atualizado! 📦")
+                st.rerun()
+            else:
+                st.error("Erro ao salvar estoque. Tente novamente.")
 
     st.divider()
 
