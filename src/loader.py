@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-import st
+import streamlit as st  # Corrigido o import
 
 # Detecta onde o app está rodando (Nuvem ou PC)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -59,4 +59,22 @@ def salvar_venda_app(nova_venda_df):
     df_final.to_excel(vendas_app_file, index=False, engine="openpyxl")
     return True
 
+def salvar_estoque(nova_linha):
+    # Salva o estoque em um arquivo separado
+    estoque_file = BASE_DIR / "estoque_app.xlsx"
+    
+    nova_df = pd.DataFrame([nova_linha])
+
+    try:
+        if estoque_file.exists():
+            df_existente = pd.read_excel(estoque_file)
+            df_final = pd.concat([df_existente, nova_df], ignore_index=True)
+        else:
+            df_final = nova_df
+
+        df_final.to_excel(estoque_file, index=False, engine="openpyxl")
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar estoque: {e}")
+        return False
 
