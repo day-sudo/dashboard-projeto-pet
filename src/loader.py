@@ -1,27 +1,41 @@
 import pandas as pd
 from pathlib import Path
 
-# Caminho base do projeto
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Caminho do arquivo Excel
-DATA_PATH = BASE_DIR / "data" / "bd_empreendimento.xlsx"
-
+DATA_PATH = Path("data")
 
 def load_data():
-    # Ler abas do Excel
-    produtos = pd.read_excel(DATA_PATH, sheet_name="Produtos")
-    vendas = pd.read_excel(DATA_PATH, sheet_name="Vendas")
-    estoque = pd.read_excel(DATA_PATH, sheet_name="Estoque")
-    custos = pd.read_excel(DATA_PATH, sheet_name="Custos")
-    calendario = pd.read_excel(DATA_PATH, sheet_name="Calendario")
+    # ==============================
+    # BASE HISTÓRICA (Excel principal)
+    # ==============================
+    base_file = DATA_PATH / "base_historica.xlsx"
 
-    # Converter colunas de data
-    vendas["data"] = pd.to_datetime(vendas["data"])
-    custos["data"] = pd.to_datetime(custos["data"])
+    produtos = pd.read_excel(base_file, sheet_name="produtos")
+    vendas_hist = pd.read_excel(base_file, sheet_name="vendas")
+    estoque = pd.read_excel(base_file, sheet_name="estoque")
+    custos = pd.read_excel(base_file, sheet_name="custos")
+    calendario = pd.read_excel(base_file, sheet_name="calendario")
 
-    # Criar valor total da venda
-    vendas["Valor_Total"] = vendas["qtd"] * vendas["valor_unit"]
+    # ==============================
+    # BASE DO APP (cadastros novos)
+    # ==============================
+    vendas_app_file = DATA_PATH / "vendas_app.xlsx"
+
+    if vendas_app_file.exists():
+        vendas_app = pd.read_excel(vendas_app_file)
+        vendas = pd.concat([vendas_hist, vendas_app], ignore_index=True)
+    else:
+        vendas = vendas_hist
+
+    # ==============================
+    # PADRONIZAR COLUNAS
+    # ==============================
+    for df in [produtos, vendas, estoque, custos, calendario]:
+        df.columns = df.columns.str.strip().str.lower()
+
+    # Converter data
+    if "data" in vendas.columns:
+        vendas["data"] = pd.to_datetime(vendas["data"])
 
     return produtos, vendas, estoque, custos, calendario
+
 
