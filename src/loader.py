@@ -1,51 +1,54 @@
 import pandas as pd
 from pathlib import Path
-import os
+import st
 
-# Caminho robusto para funcionar na nuvem e local
-BASE_DIR = Path(__file__).parent.parent
-DADOS_PATH = BASE_DIR / "Dados"
+# Detecta onde o app está rodando (Nuvem ou PC)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 def load_dados():
-    # ==============================
-    # BASE HISTÓRICA
-    # ==============================
-    base_file = DADOS_PATH / "base_historica.xlsx"
+    # Lista de nomes possíveis que você mencionou ter na pasta
+    arquivos_possiveis = [
+        "Dados/base_historica.xlsx",
+        "dados/base_historica.xlsx",
+        "Dados/historico_ecopad.xlsx",
+        "dados/historico_ecopad.xlsx",
+        "historico_ecopad.xlsx",
+        "base_historica.xlsx"
+    ]
     
-    # Se o arquivo não existir, criamos um erro amigável
-    if not base_file.exists():
+    caminho_final = None
+    
+    # O "Detetive": Procura qual desses arquivos realmente existe no seu GitHub
+    for nome in arquivos_possiveis:
+        teste_path = BASE_DIR / nome
+        if teste_path.exists():
+            caminho_final = teste_path
+            break
+
+    if not caminho_final:
         return None, None, None, None, None
 
-    produtos = pd.read_excel(base_file, sheet_name="produtos")
-    vendas_hist = pd.read_excel(base_file, sheet_name="vendas")
-    estoque = pd.read_excel(base_file, sheet_name="estoque")
-    custos = pd.read_excel(base_file, sheet_name="custos")
-    calendario = pd.read_excel(base_file, sheet_name="calendario")
+    try:
+        # Tenta ler as abas. Se o seu Excel tiver nomes de abas diferentes, 
+        # o pandas vai avisar, mas aqui usamos os nomes padrão que definimos.
+        produtos = pd.read_excel(caminho_final, sheet_name="produtos")
+        vendas = pd.read_excel(caminho_final, sheet_name="vendas")
+        estoque = pd.read_excel(caminho_final, sheet_name="estoque")
+        custos = pd.read_excel(caminho_final, sheet_name="custos")
+        calendario = pd.read_excel(caminho_final, sheet_name="calendario")
 
-    # ==============================
-    # BASE DO APP (Integração de novos lançamentos)
-    # ==============================
-    vendas_app_file = DADOS_PATH / "vendas_app.xlsx"
+        # Padroniza tudo para minúsculo para os gráficos não quebrarem
+        for df in [produtos, vendas, estoque, custos, calendario]:
+            df.columns = df.columns.str.strip().str.lower()
 
-    if vendas_app_file.exists():
-        vendas_app = pd.read_excel(vendas_app_file)
-        vendas = pd.concat([vendas_hist, vendas_app], ignore_index=True)
-    else:
-        vendas = vendas_hist
-
-    # Padronizar colunas
-    for df in [produtos, vendas, estoque, custos, calendario]:
-        df.columns = df.columns.str.strip().str.lower()
-
-    # Converter data - Verificando se a coluna existe
-    if "data" in vendas.columns:
-        vendas["data"] = pd.to_datetime(vendas["data"])
-
-    return produtos, vendas, estoque, custos, calendario
+        return produtos, vendas, estoque, custos, calendario
+    except Exception as e:
+        print(f"Erro na leitura: {e}")
+        return None, None, None, None, None
 
 def salvar_venda_app(nova_venda_df):
-    """Salva apenas no arquivo incremental para não corromper a base histórica"""
-    vendas_app_file = DADOS_PATH / "vendas_app.xlsx"
+    # Salva em um arquivo simples na raiz para evitar erro de permissão de pasta
+    vendas_app_file = BASE_DIR / "vendas_cadastradas.xlsx"
     
     if vendas_app_file.exists():
         df_existente = pd.read_excel(vendas_app_file)
@@ -54,5 +57,6 @@ def salvar_venda_app(nova_venda_df):
         df_final = nova_venda_df
         
     df_final.to_excel(vendas_app_file, index=False, engine="openpyxl")
+    return True
 
 
