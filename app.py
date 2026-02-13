@@ -15,23 +15,25 @@ st.set_page_config(
 )
 
 # ==============================
-# FUNÇÃO DE "IA" LÓGICA
+# FUNÇÃO DE INSIGHTS
 # ==============================
 def gerar_insights_ia(df_vendas, df_estoque, lucro_atual):
     insights = []
+
     if not df_vendas.empty:
         top_canal = df_vendas.groupby("plataforma")["valor_total"].sum().idxmax()
-        insights.append(f"📢 **Canal Forte:** A {top_canal} é sua maior fonte de renda.")
-    
+        insights.append(f"📢 Canal forte: {top_canal}")
+
     estoque_critico = df_estoque[df_estoque["status"] == "BAIXO"]
     if not estoque_critico.empty:
         prod_critico = estoque_critico.iloc[0]["nome_produto"]
-        insights.append(f"🚨 **Risco:** O produto *{prod_critico}* está com estoque baixo.")
-    
+        insights.append(f"🚨 Estoque baixo: {prod_critico}")
+
     if lucro_atual < 0:
-        insights.append("📉 **Atenção:** A operação está em fase de investimento (lucro negativo).")
+        insights.append("📉 Operação com prejuízo.")
     else:
-        insights.append("🚀 **Saúde Financeira:** Operação lucrativa!")
+        insights.append("🚀 Operação lucrativa.")
+
     return insights
 
 # ==============================
@@ -39,65 +41,100 @@ def gerar_insights_ia(df_vendas, df_estoque, lucro_atual):
 # ==============================
 try:
     produtos, vendas, estoque, custos, calendario = load_data()
+
+    # Padronizar colunas
     for df in [produtos, vendas, estoque, custos, calendario]:
         df.columns = df.columns.str.strip().str.lower()
+
+    # Converter datas
+    vendas["data"] = pd.to_datetime(vendas["data"], errors="coerce")
+    calendario["data"] = pd.to_datetime(calendario["data"], errors="coerce")
+
+    # Criar valor total
     vendas["valor_total"] = vendas["valor_unit"] * vendas["qtd"]
+
 except Exception as e:
-    st.error(f"Erro no carregamento: {e}")
+    st.error(f"Erro no carregamento dos dados: {e}")
     st.stop()
 
 # ==============================
-# BARRA LATERAL (COCKPIT)
+# SIDEBAR
 # ==============================
 with st.sidebar:
+
     st.title("🌿 Gerenciador EcoPad")
     st.markdown("*Gestão Estratégica & Sustentável*")
     st.divider()
 
-    with st.expander("🔍 Filtros Operacionais", expanded=True):
-        vendas = vendas.merge(calendario, on="data", how="left")
-        meses = vendas["nome_mes"].dropna().unique()
-        mes_selecionado = st.multiselect("Período (Mês):", options=meses, default=meses)
-        
-        plataformas = vendas["plataforma"].unique()
-        canal_selecionado = st.multiselect("Canal de Venda:", options=plataformas, default=plataformas)
+    # Merge com calendário
+    vendas = vendas.merge(calendario, on="data", how="left")
 
-    vendas_filtradas = vendas[vendas["nome_mes"].isin(mes_selecionado)]
-    if canal_selecionado:
-        vendas_filtradas = vendas_filtradas[vendas_filtradas["plataforma"].isin(canal_selecionado)]
+    meses = vendas["nome_mes"].dropna().unique()
+    plataformas = vendas["plataforma"].dropna().unique()
 
+    mes_sel = st.multiselect("Período (Mês)", meses, default=meses)
+    canal_sel = st.multiselect("Canal", plataformas, default=plataformas)
+
+    vendas_filtradas = vendas.copy()
+
+    if mes_sel:
+        vendas_filtradas = vendas_filtradas[
+            vendas_filtradas["nome_mes"].isin(mes_sel)
+        ]
+
+    if canal_sel:
+        vendas_filtradas = vendas_filtradas[
+            vendas_filtradas["plataforma"].isin(canal_sel)
+        ]
+
+    # Assistente IA
     st.divider()
-    st.subheader("🤖 Assistente Virtual")
-    if st.button("Gerar Análise Estratégica"):
+    st.subheader("🤖 Assistente")
+
+    if st.button("Gerar análise"):
+
         with st.spinner("Analisando..."):
-            time.sleep(1)
-            # Recálculo rápido para a IA
-            rec_ia = vendas_filtradas["valor_total"].sum()
-            cust_fixo_ia = custos["valor"].sum()
-            v_full_ia = vendas_filtradas.merge(produtos, on="id_produto", how="left")
-            c_var_ia = (v_full_ia["qtd"] * v_full_ia["custo_unit"].fillna(0)).sum()
-            lucro_ia = rec_ia - cust_fixo_ia - c_var_ia
-            
-            # Recálculo estoque para IA
-            estoque["atual"] = estoque["estoque_inicial"] + estoque["entradas"] - estoque["saidas"]
-            estoque["status"] = estoque.apply(lambda x: "BAIXO" if x["atual"] <= x["ponto_reposicao"] else "OK", axis=1)
-            estoque_ia = estoque.merge(produtos[["id_produto", "nome_produto"]], on="id_produto")
-            
-            dicas = gerar_insights_ia(vendas_filtradas, estoque_ia, lucro_ia)
-            for dica in dicas:
-                st.info(dica)
 
-    st.divider()
-    st.subheader("🔔 Alertas")
-    estoque["atual_alert"] = estoque["estoque_inicial"] + estoque["entradas"] - estoque["saidas"]
-    criticos = estoque[estoque["atual_alert"] <= estoque["ponto_reposicao"]]
-    if not criticos.empty:
-        st.error(f"Reponha {len(criticos)} itens!")
-    else:
-        st.success("Estoque OK ✅")
+            receita_ia = vendas_filtradas["valor_total"].sum()
+            custo_fixo_ia = custos["valor"].sum()
+
+            v_full = vendas_filtradas.merge(produtos, on="id_produto", how="left")
+
+            custo_var_ia = (
+                v_full["qtd"] * v_full["custo_unit"].fillna(0)
+            ).sum()
+
+            lucro_ia = receita_ia - custo_fixo_ia - custo_var_ia
+
+            estoque["atual"] = (
+                estoque["estoque_inicial"]
+                + estoque["entradas"]
+                - estoque["saidas"]
+            )
+
+            estoque["status"] = estoque.apply(
+                lambda x: "BAIXO"
+                if x["atual"] <= x["ponto_reposicao"]
+                else "OK",
+                axis=1,
+            )
+
+            estoque_ia = estoque.merge(
+                produtos[["id_produto", "nome_produto"]],
+                on="id_produto"
+            )
+
+            dicas = gerar_insights_ia(
+                vendas_filtradas,
+                estoque_ia,
+                lucro_ia
+            )
+
+            for d in dicas:
+                st.info(d)
 
 # ==============================
-# ÁREA PRINCIPAL (DASHBOARD)
+# DASHBOARD PRINCIPAL
 # ==============================
 st.title("📊 Visão Geral da Operação")
 
@@ -105,41 +142,91 @@ receita = vendas_filtradas["valor_total"].sum()
 itens = vendas_filtradas["qtd"].sum()
 custo_fixo = custos["valor"].sum()
 
-vendas_full = vendas_filtradas.merge(produtos, on="id_produto", how="left")
-custo_var = (vendas_full["qtd"] * vendas_full["custo_unit"].fillna(0)).sum()
+vendas_full = vendas_filtradas.merge(
+    produtos,
+    on="id_produto",
+    how="left"
+)
 
-# CORREÇÃO AQUI: Usando a variável correta 'custo_fixo'
+custo_var = (
+    vendas_full["qtd"] * vendas_full["custo_unit"].fillna(0)
+).sum()
+
 lucro = receita - custo_fixo - custo_var
 
+# KPIs
 col1, col2, col3, col4 = st.columns(4)
+
 col1.metric("Faturamento", f"R$ {receita:,.2f}")
-col2.metric("Vendas (Qtd)", itens)
-col3.metric("Custos Fixos", f"R$ {custo_fixo:,.2f}")
+col2.metric("Itens vendidos", itens)
+col3.metric("Custos fixos", f"R$ {custo_fixo:,.2f}")
 col4.metric("Resultado", f"R$ {lucro:,.2f}")
 
 st.divider()
 
+# ==============================
+# GRÁFICOS
+# ==============================
 col_g1, col_g2 = st.columns(2)
+
 with col_g1:
-    st.markdown("### 🛒 Performance por Canal")
+    st.subheader("🛒 Vendas por canal")
+
     if not vendas_filtradas.empty:
-        fig1 = px.pie(vendas_filtradas, names="plataforma", values="valor_total", hole=0.6)
+        fig1 = px.pie(
+            vendas_filtradas,
+            names="plataforma",
+            values="valor_total",
+            hole=0.5
+        )
         st.plotly_chart(fig1, use_container_width=True)
 
 with col_g2:
-    st.markdown("### 📈 Tendência de Faturamento")
+    st.subheader("📈 Evolução das vendas")
+
     if not vendas_filtradas.empty:
-        vendas_dia = vendas_filtradas.groupby("data")["valor_total"].sum().reset_index()
-        fig2 = px.area(vendas_dia, x="data", y="valor_total", color_discrete_sequence=['#4CAF50'])
+        vendas_dia = (
+            vendas_filtradas
+            .groupby("data")["valor_total"]
+            .sum()
+            .reset_index()
+        )
+
+        fig2 = px.area(
+            vendas_dia,
+            x="data",
+            y="valor_total"
+        )
+
         st.plotly_chart(fig2, use_container_width=True)
 
-st.markdown("### 📦 Controle de Estoque")
-estoque_view = estoque.merge(produtos[["id_produto", "nome_produto"]], on="id_produto")
-estoque_view["atual"] = estoque_view["estoque_inicial"] + estoque_view["entradas"] - estoque_view["saidas"]
-estoque_view["status_visual"] = estoque_view.apply(lambda x: "🔴 COMPRAR" if x["atual"] <= x["ponto_reposicao"] else "🟢 OK", axis=1)
+# ==============================
+# ESTOQUE
+# ==============================
+st.subheader("📦 Controle de Estoque")
+
+estoque_view = estoque.merge(
+    produtos[["id_produto", "nome_produto"]],
+    on="id_produto"
+)
+
+estoque_view["atual"] = (
+    estoque_view["estoque_inicial"]
+    + estoque_view["entradas"]
+    - estoque_view["saidas"]
+)
+
+estoque_view["status"] = estoque_view.apply(
+    lambda x: "🔴 COMPRAR"
+    if x["atual"] <= x["ponto_reposicao"]
+    else "🟢 OK",
+    axis=1
+)
 
 st.dataframe(
-    estoque_view[["nome_produto", "atual", "ponto_reposicao", "status_visual"]],
+    estoque_view[
+        ["nome_produto", "atual", "ponto_reposicao", "status"]
+    ],
     use_container_width=True,
     hide_index=True
 )
