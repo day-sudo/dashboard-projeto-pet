@@ -139,7 +139,7 @@ with st.sidebar:
 # ==============================
 # DASHBOARD PRINCIPAL
 # ==============================
-st.title("📊 Visão Geral da Operação")
+st.title("📈 Visão Geral da Operação")
 
 receita = vendas_filtradas["valor_total"].sum()
 itens = vendas_filtradas["qtd"].sum()
