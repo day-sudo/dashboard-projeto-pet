@@ -1,18 +1,22 @@
 import streamlit as st
+
+# ==============================
+# CONFIGURAÇÃO INICIAL (OBRIGATORIAMENTE PRIMEIRO)
+# ==============================
+st.set_page_config(
+    page_title="EcoPad Manager",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import plotly.express as px
 from src.loader import load_data
 import time
+st.sidebar.image("logo_ecopad.png", width=180)
+st.sidebar.title("EcoPad Manager")
 
-# ==============================
-# CONFIGURAÇÃO INICIAL
-# ==============================
-st.set_page_config(
-    page_title="EcoPad Manager",
-    layout="wide",
-    page_icon="🌿",
-    initial_sidebar_state="expanded"
-)
 
 # ==============================
 # FUNÇÃO DE INSIGHTS
