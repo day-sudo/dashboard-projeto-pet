@@ -14,7 +14,7 @@ import pandas as pd
 import plotly.express as px
 from src.loader import load_data
 import time
-st.sidebar.image("logo_ecopad.png", width=80)
+st.sidebar.image("logo_ecopad.png", width=100)
 st.sidebar.title("EcoPad Manager")
 
 
