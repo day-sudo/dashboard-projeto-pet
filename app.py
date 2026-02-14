@@ -4,7 +4,7 @@ import streamlit as st
 # CONFIGURAÇÃO INICIAL (OBRIGATORIAMENTE PRIMEIRO)
 # ==============================
 st.set_page_config(
-    page_title="EcoPad Manager",
+    page_title="Gerenciador EcoPad",
     page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -66,8 +66,8 @@ except Exception as e:
 # ==============================
 with st.sidebar:
 
-    st.title("🌿 Gerenciador EcoPad")
-    st.markdown("*Gestão Estratégica & Sustentável*")
+    st.title("🌿 Gestão Estratégica & Sustentáve")
+    st.markdown("*Daiane Nicacio*")
     st.divider()
 
     # Merge com calendário
