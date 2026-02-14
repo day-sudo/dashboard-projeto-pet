@@ -1,7 +1,7 @@
 # 🌿 EcoPad Manager
 
 <p align="center">
-  <img src="logo.png" alt="EcoPad Logo" width="300">
+  <img src="logo_ecopad.png" alt="EcoPad Logo" width="300">
 </p>
 
 Sistema de gerenciamento sustentável para controle de empreendimentos, indicadores e análises operacionais.
