@@ -139,7 +139,7 @@ with st.sidebar:
 # ==============================
 # DASHBOARD PRINCIPAL
 # ==============================
-st.title("📈 Visão Geral da Operação")
+st.title("👩🏻‍💻 Visão Geral da Operação")
 
 receita = vendas_filtradas["valor_total"].sum()
 itens = vendas_filtradas["qtd"].sum()
@@ -185,7 +185,7 @@ with col_g1:
         st.plotly_chart(fig1, use_container_width=True)
 
 with col_g2:
-    st.subheader("👩🏻‍💻 Evolução das vendas")
+    st.subheader("📈 Evolução das vendas")
 
     if not vendas_filtradas.empty:
         vendas_dia = (
