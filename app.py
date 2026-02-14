@@ -66,8 +66,8 @@ except Exception as e:
 # ==============================
 with st.sidebar:
 
-    st.title("🌿 Gestão Estratégica & Sustentáve")
-    st.markdown("*Daiane Nicacio*")
+    st.title("🌿 Gestão Estratégica")
+    st.markdown("**")
     st.divider()
 
     # Merge com calendário
