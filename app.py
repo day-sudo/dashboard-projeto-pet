@@ -185,7 +185,7 @@ with col_g1:
         st.plotly_chart(fig1, use_container_width=True)
 
 with col_g2:
-    st.subheader("📈 Evolução das vendas")
+    st.subheader("👩🏻‍💻 Evolução das vendas")
 
     if not vendas_filtradas.empty:
         vendas_dia = (
